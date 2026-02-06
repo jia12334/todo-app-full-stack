@@ -11,8 +11,12 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Check for session cookie (Better Auth uses this pattern)
-  const sessionCookie = request.cookies.get("better-auth.session_token")
-    || request.cookies.get("better-auth.session");
+  // On HTTPS, cookies have __Secure- prefix
+  const sessionCookie =
+    request.cookies.get("__Secure-better-auth.session_token") ||
+    request.cookies.get("better-auth.session_token") ||
+    request.cookies.get("__Secure-better-auth.session") ||
+    request.cookies.get("better-auth.session");
   const isAuthenticated = !!sessionCookie?.value;
 
   // Protect routes that require authentication
