@@ -1,11 +1,60 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { Pool } from "pg";
 
-export async function GET() {
+function normalizeURL(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+function getBaseURL(): string {
+  if (process.env.BETTER_AUTH_URL) {
+    return normalizeURL(process.env.BETTER_AUTH_URL);
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+  return normalizeURL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000");
+}
+
+function getTrustedOrigins(): string[] {
+  const origins: string[] = [];
+  if (process.env.VERCEL_URL) {
+    origins.push(`https://${process.env.VERCEL_URL}`);
+  }
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    origins.push(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`);
+  }
+  if (process.env.BETTER_AUTH_URL) {
+    origins.push(normalizeURL(process.env.BETTER_AUTH_URL));
+  }
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    origins.push(normalizeURL(process.env.NEXT_PUBLIC_APP_URL));
+  }
+  origins.push("http://localhost:3000");
+  return [...new Set(origins)];
+}
+
+export async function GET(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  const host = req.headers.get("host");
+  const baseURL = getBaseURL();
+  const trustedOrigins = getTrustedOrigins();
+
   const checks: Record<string, unknown> = {
+    auth_debug: {
+      computed_baseURL: baseURL,
+      trusted_origins: trustedOrigins,
+      incoming_origin: origin,
+      incoming_host: host,
+      host_url: `https://${host}`,
+      is_origin_trusted: trustedOrigins.includes(origin || "") || trustedOrigins.includes(`https://${host}`),
+    },
     env: {
       DATABASE_URL: !!process.env.DATABASE_URL,
       BETTER_AUTH_SECRET: !!process.env.BETTER_AUTH_SECRET,
+      BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? "(not set)",
       NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? "(not set)",
       VERCEL_URL: process.env.VERCEL_URL ?? "(not set)",
       VERCEL_PROJECT_PRODUCTION_URL:
